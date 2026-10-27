@@ -1,0 +1,62 @@
+@startuml components
+!include style.iuml
+title Crate modules and dependencies (src/)
+
+skinparam packageStyle rectangle
+left to right direction
+
+component "main.rs\n(binary)" as main
+
+package "lib.rs — build_app()" as lib {
+  component "routes::health" as r_health
+  component "routes::auth\nregister, login" as r_auth
+  component "routes::todos\nlist, create, get,\nupdate, delete" as r_todos
+
+  component "extract\nAppJson, AppPath, AppQuery" as extract
+  component "auth::extractor\nAuthUser" as auth_ext
+  component "auth::jwt\nissue, verify" as jwt
+  component "auth::password\nhash, verify (argon2id)" as pwd
+
+  component "models::user\nUser, Credentials,\nUserResponse, TokenResponse" as m_user
+  component "models::todo\nTodo, CreateTodo, UpdateTodo,\nListParams, Page" as m_todo
+
+  component "repo::user_repo" as repo_user
+  component "repo::todo_repo" as repo_todo
+
+  component "state\nAppState { pool, config }" as state
+  component "config\nConfig::from_env" as config
+  component "error\nAppError -> HTTP" as error
+  component "telemetry\ntracing subscriber" as telemetry
+}
+
+database "PostgreSQL" as pg
+
+main --> config
+main --> telemetry
+main --> state : builds
+main --> lib : build_app(state)
+
+r_auth --> extract
+r_auth --> m_user
+r_auth --> pwd
+r_auth --> jwt
+r_auth --> repo_user
+
+r_todos --> extract
+r_todos --> auth_ext
+r_todos --> m_todo
+r_todos --> repo_todo
+
+auth_ext --> jwt
+auth_ext --> state
+
+repo_user --> m_user
+repo_todo --> m_todo
+repo_user --> pg : sqlx::query_as!
+repo_todo --> pg : sqlx::query_as!
+
+state --> config
+
+note "error::AppError is the shared error type:\nused by extract, auth, models (validation),\nrepo (sqlx::Error mapping) and routes." as N_err
+N_err .. error
+@enduml

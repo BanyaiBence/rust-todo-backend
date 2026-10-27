@@ -1,0 +1,54 @@
+@startuml seq-todo-update
+!include style.iuml
+title PATCH /todos/{id} (representative authenticated request)
+
+actor Client
+participant "AuthUser\nextractor" as A
+participant "auth::jwt" as J
+participant "AppPath / AppJson" as X
+participant "routes::todos::update" as H
+participant "UpdateTodo" as M
+participant "repo::todo_repo" as R
+database PostgreSQL as DB
+
+Client -> A : Authorization: Bearer <jwt>
+A -> J : verify(token, JWT_SECRET)
+alt missing / bad signature / expired
+  J --> A : AppError::Unauthorized
+  A --> Client : 401
+end
+J --> A : Claims { sub = user_id }
+
+A -> X : extract id, body
+alt id is not a UUID
+  X --> Client : 404
+else malformed / unknown fields in body
+  X --> Client : 422
+end
+
+X -> H : user_id, id, UpdateTodo
+H -> M : validate()
+note right of M
+  At least one field required.
+  title trimmed, 1–200 chars.
+  description <= 2000 chars;
+  "description": null clears it.
+end note
+M --> H : TodoChanges
+
+H -> R : update(user_id, id, changes)
+R -> DB : UPDATE todos SET ...\nWHERE id = $1 AND user_id = $2\nRETURNING ...
+note right of DB
+  Ownership is enforced in the WHERE clause:
+  another user's todo looks exactly like a
+  missing one (404, not 403).
+end note
+alt row returned
+  DB --> R : row
+  R --> H : Some(Todo)
+  H --> Client : 200 Todo
+else no row
+  R --> H : None
+  H --> Client : 404
+end
+@enduml

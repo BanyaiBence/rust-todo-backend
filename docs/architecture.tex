@@ -1,0 +1,193 @@
+% Architecture documentation for todo-backend.
+% Build with docs/build.sh, which renders the diagrams to build/figures/*.pdf first.
+\documentclass[a4paper,11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[margin=2cm]{geometry}
+\usepackage{graphicx}
+\usepackage{pdflscape}
+\usepackage{booktabs}
+\usepackage{parskip}
+\usepackage[font=small,labelfont=bf,hypcap=false]{caption}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{build/figures/}}
+
+% build.sh writes the git revision here; fall back gracefully when run by hand.
+\IfFileExists{build/version.tex}{\input{build/version.tex}}{\newcommand{\docversion}{unknown}}
+
+\hypersetup{
+  pdftitle={todo-backend architecture},
+  pdfsubject={Architecture diagrams},
+}
+
+% Page dimensions in portrait orientation, saved before any landscape page swaps them.
+\newlength{\portraitwidth}
+\newlength{\portraitheight}
+\AtBeginDocument{%
+  \setlength{\portraitwidth}{\textwidth}%
+  \setlength{\portraitheight}{\textheight}%
+}
+
+% Room left for a section heading, a short paragraph and the caption.
+\newcommand{\textallowance}{9\baselineskip}
+
+% \diagram{file}{caption}: a figure scaled to fill the rest of a portrait page.
+% Not a float, so it stays on the same page as its section text.
+\newcommand{\diagram}[2]{%
+  \begin{center}
+    \includegraphics[width=\portraitwidth,
+                     height=\dimexpr\portraitheight-\textallowance\relax,
+                     keepaspectratio]{#1}
+    \captionof{figure}{#2}
+  \end{center}%
+}
+
+% \widediagram{file}{caption}: the same for use inside a landscape environment.
+\newcommand{\widediagram}[2]{%
+  \begin{center}
+    \includegraphics[width=\portraitheight,
+                     height=\dimexpr\portraitwidth-\textallowance\relax,
+                     keepaspectratio]{#1}
+    \captionof{figure}{#2}
+  \end{center}%
+}
+
+\title{\texttt{todo-backend}\\[0.3em]\large Architecture documentation}
+\author{}
+\date{\today\\[0.3em]\small Revision \texttt{\docversion}}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\section*{Overview}
+
+\texttt{todo-backend} is a small JSON API for a todo app: users register, log in, and manage
+their own todo entries. It is written in Rust with \textbf{axum} and \textbf{tokio}, stores
+data in \textbf{PostgreSQL} through \textbf{sqlx}, hashes passwords with \textbf{argon2id}, and
+authenticates requests with \textbf{HS256 JWT} bearer tokens. It runs as two containers, the
+app and its database, via Docker Compose.
+
+The diagrams in this document are generated from the PlantUML sources in
+\texttt{docs/architecture/}; edit those and rebuild with \texttt{docs/build.sh}.
+
+\begin{center}
+\small
+\begin{tabular}{@{}rlll@{}}
+  \toprule
+  \# & Diagram & Type & Shows \\
+  \midrule
+  1  & System context   & use case   & Clients, the API and PostgreSQL \\
+  2  & Deployment       & deployment & Compose services, network, volume, test DB \\
+  3  & Components       & component  & Crate modules and their dependencies \\
+  4  & Request pipeline & activity   & Tower layers, extractors, error mapping \\
+  5  & Register         & sequence   & \texttt{POST /auth/register} \\
+  6  & Login            & sequence   & \texttt{POST /auth/login} \\
+  7  & Update a todo    & sequence   & \texttt{PATCH /todos/\{id\}} \\
+  8  & Data model       & ER         & \texttt{users} and \texttt{todos} tables \\
+  9  & Models           & class      & Request and response types, validation \\
+  10 & Errors and state & class      & \texttt{AppError}, \texttt{Config}, \texttt{AppState} \\
+  11 & Lifecycle        & activity   & Startup, migrations, graceful shutdown \\
+  12 & Test layout      & component  & Test suites and what each exercises \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\clearpage
+\tableofcontents
+\listoffigures
+\clearpage
+
+\section{System context}
+The API serves two kinds of client: scripts and tools calling it directly, and browser
+applications on origins listed in \texttt{CORS\_ALLOWED\_ORIGINS}. All persistent state lives in
+PostgreSQL, reached through a pool of at most ten connections.
+\diagram{system-context}{System context}
+
+\begin{landscape}
+\section{Deployment}
+Docker Compose runs the app and its database on a private network; only the app's port is
+published. The \texttt{db-test} service, enabled with the \texttt{test} profile, is a throwaway
+database on \texttt{tmpfs} for \texttt{cargo test} and sqlx's compile-time query checks.
+\widediagram{deployment}{Deployment (\texttt{docker-compose.yml})}
+\end{landscape}
+
+\begin{landscape}
+\section{Components}
+\texttt{main.rs} loads configuration, initialises tracing, builds the shared
+\texttt{AppState} and hands it to \texttt{build\_app}. Routes depend on extractors, request
+models and repositories; only the repositories talk to the database. \texttt{AppError} is the
+single error type shared by every layer.
+\widediagram{components}{Crate modules and dependencies}
+\end{landscape}
+
+\section{Request pipeline}
+Every request passes through tracing, CORS and the 64\,KiB body limit before routing. Handler
+arguments are custom extractors that turn malformed input into an \texttt{AppError}, so every
+error response has the same \texttt{\{"error": "..."\}} shape.
+\diagram{request-pipeline}{Request pipeline}
+
+\begin{landscape}
+\section{Registration}
+Passwords are hashed with argon2id on tokio's blocking thread pool so the CPU-heavy work does
+not stall the async runtime. A duplicate username surfaces as a unique-constraint violation and
+is reported as \texttt{409 Conflict}.
+\widediagram{seq-register}{\texttt{POST /auth/register}}
+\end{landscape}
+
+\begin{landscape}
+\section{Login}
+When the username is unknown, the password is still verified against a dummy hash, so the
+response time does not reveal which usernames exist. Successful logins receive an HS256 token
+whose lifetime is \texttt{JWT\_TTL\_SECONDS}.
+\widediagram{seq-login}{\texttt{POST /auth/login}}
+\end{landscape}
+
+\begin{landscape}
+\section{Authenticated todo request}
+\texttt{PATCH /todos/\{id\}} is representative of all todo routes: the \texttt{AuthUser}
+extractor verifies the token, the request body is validated into a change set, and the query
+filters on both the todo id and the caller's id. Another user's todo is therefore
+indistinguishable from a missing one.
+\widediagram{seq-todo-update}{\texttt{PATCH /todos/\{id\}}}
+\end{landscape}
+
+\begin{landscape}
+\section{Data model}
+Two tables, created by the migrations in \texttt{migrations/} and applied automatically on
+startup. Deleting a user cascades to their todos.
+\widediagram{data-model}{Database schema}
+\end{landscape}
+
+\section{Request and response models}
+Request types are validated into separate, already-checked types before reaching the
+repositories, so a repository never sees unvalidated input. \texttt{User} carries the password
+hash and is never serialised; responses use \texttt{UserResponse}.
+\diagram{models}{Request and response models}
+
+\begin{landscape}
+\section{Errors, configuration and shared state}
+\texttt{AppError} maps each failure to an HTTP status; server-side details are logged rather
+than returned. \texttt{AppState} is cloned into every handler and holds the connection pool and
+the configuration loaded at startup.
+\widediagram{errors-and-state}{Errors, configuration and shared state}
+\end{landscape}
+
+\section{Process lifecycle}
+Configuration errors abort startup with a message. On SIGTERM (as sent by \texttt{docker stop})
+or Ctrl-C the server stops accepting connections, lets in-flight requests finish, and closes
+the pool.
+\diagram{lifecycle}{Process lifecycle}
+
+\clearpage
+\section{Test layout}
+Unit tests cover pure logic. Repository and API tests run against a fresh database per test via
+\texttt{\#[sqlx::test]}, with the API exercised in-process through \texttt{tower}. End-to-end
+tests drive the real Docker Compose stack over HTTP and run in CI.
+\diagram{test-layout}{Test suites}
+
+\end{document}

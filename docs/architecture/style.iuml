@@ -1,0 +1,29 @@
+' Shared look for all architecture diagrams.
+skinparam shadowing false
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 12
+skinparam roundCorner 8
+skinparam ArrowColor #444444
+skinparam BackgroundColor #FFFFFF
+skinparam NoteBackgroundColor #FFFDE7
+skinparam NoteBorderColor #BDB76B
+
+skinparam rectangle {
+  BackgroundColor<<system>> #E3F2FD
+  BorderColor<<system>> #1565C0
+  BackgroundColor<<layer>> #F5F5F5
+  BorderColor<<layer>> #9E9E9E
+}
+skinparam component {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam database {
+  BackgroundColor #FFF3E0
+  BorderColor #E65100
+}
+skinparam sequence {
+  LifeLineBorderColor #888888
+  ParticipantBackgroundColor #E3F2FD
+  ParticipantBorderColor #1565C0
+}

@@ -1,0 +1,12 @@
+\contentsline {figure}{\numberline {1}{\ignorespaces System context}}{3}{figure.1}%
+\contentsline {figure}{\numberline {2}{\ignorespaces Deployment (\texttt {docker-compose.yml})}}{4}{figure.2}%
+\contentsline {figure}{\numberline {3}{\ignorespaces Crate modules and dependencies}}{5}{figure.3}%
+\contentsline {figure}{\numberline {4}{\ignorespaces Request pipeline}}{6}{figure.4}%
+\contentsline {figure}{\numberline {5}{\ignorespaces \texttt {POST /auth/register}}}{7}{figure.5}%
+\contentsline {figure}{\numberline {6}{\ignorespaces \texttt {POST /auth/login}}}{8}{figure.6}%
+\contentsline {figure}{\numberline {7}{\ignorespaces \texttt {PATCH /todos/\{id\}}}}{9}{figure.7}%
+\contentsline {figure}{\numberline {8}{\ignorespaces Database schema}}{10}{figure.8}%
+\contentsline {figure}{\numberline {9}{\ignorespaces Request and response models}}{11}{figure.9}%
+\contentsline {figure}{\numberline {10}{\ignorespaces Errors, configuration and shared state}}{12}{figure.10}%
+\contentsline {figure}{\numberline {11}{\ignorespaces Process lifecycle}}{13}{figure.11}%
+\contentsline {figure}{\numberline {12}{\ignorespaces Test suites}}{14}{figure.12}%

@@ -1,0 +1,38 @@
+@startuml data-model
+!include style.iuml
+title Database schema (migrations/)
+
+hide circle
+skinparam linetype ortho
+
+entity "users" as users {
+  * id : UUID <<PK>>
+  --
+  * username : TEXT <<UNIQUE>>
+  * password_hash : TEXT
+  * created_at : TIMESTAMPTZ = now()
+}
+
+entity "todos" as todos {
+  * id : UUID <<PK>>
+  --
+  * user_id : UUID <<FK users.id ON DELETE CASCADE>>
+  * title : TEXT  CHECK length 1..200
+    description : TEXT
+  * completed : BOOLEAN = false
+  * created_at : TIMESTAMPTZ = now()
+  * updated_at : TIMESTAMPTZ = now()
+}
+
+users ||--o{ todos : owns
+
+note right of todos
+  INDEX idx_todos_user_id (user_id)
+  List order: created_at, id
+end note
+
+note bottom of users
+  IDs are generated in the app (Uuid::new_v4).
+  Migrations run on startup via sqlx::migrate!().
+end note
+@enduml

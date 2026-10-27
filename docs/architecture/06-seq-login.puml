@@ -1,0 +1,40 @@
+@startuml seq-login
+!include style.iuml
+title POST /auth/login
+
+actor Client
+participant "routes::auth::login" as H
+participant "repo::user_repo" as R
+database PostgreSQL as DB
+participant "auth::password" as P
+participant "auth::jwt" as J
+
+Client -> H : {"username", "password"}
+H -> R : find_by_username(username)
+R -> DB : SELECT ... FROM users WHERE username = $1
+DB --> R : row | none
+R --> H : Option<User>
+
+alt user found
+  H -> H : hash = user.password_hash
+else unknown user
+  H -> P : dummy_hash()
+  note right
+    A real argon2 hash of a random value,
+    so unknown users take as long as a
+    wrong password (no timing oracle).
+  end note
+  P --> H : hash
+end
+
+H -> P : verify(password, hash)\n(spawn_blocking)
+P --> H : bool
+
+alt password ok AND user exists
+  H -> J : issue(user_id, JWT_SECRET, JWT_TTL_SECONDS)
+  J --> H : HS256 token {sub, iat, exp}
+  H --> Client : 200 {"token", "token_type": "Bearer", "expires_in"}
+else
+  H --> Client : 401 {"error": "unauthorized"}
+end
+@enduml

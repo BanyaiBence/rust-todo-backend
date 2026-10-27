@@ -1,0 +1,29 @@
+@startuml test-layout
+!include style.iuml
+title Test suites (tests/) and what they exercise
+
+left to right direction
+
+package "tests/" {
+  component "unit\nconfig, error, auth::*, models::*" as unit
+  component "repo\nuser_repo, todo_repo" as repo
+  component "api\nhealth, auth, todos, cors" as api
+  component "e2e\n(#[ignore], run in CI)" as e2e
+  component "common\nshared helpers" as common
+}
+
+component "pure functions, no DB\n(AuthUser via a one-route router)" as pure
+component "repo::* + sqlx" as sqlx
+component "build_app(state)\nin-process via tower::ServiceExt" as router
+component "docker compose stack\nover real HTTP (reqwest)" as stack
+database "PostgreSQL\n(#[sqlx::test]: fresh DB per test)" as pg
+
+unit --> pure
+repo --> sqlx
+sqlx --> pg
+api --> router
+router --> pg
+e2e --> stack
+api ..> common
+repo ..> common
+@enduml

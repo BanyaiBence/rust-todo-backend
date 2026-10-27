@@ -1,0 +1,74 @@
+@startuml models
+!include style.iuml
+title Request and response models
+
+left to right direction
+
+package "models::user" as pkg_user {
+  class User {
+    id : Uuid
+    username : String
+    password_hash : String
+    created_at : DateTime<Utc>
+  }
+  class UserResponse <<response>> {
+    id : Uuid
+    username : String
+    created_at : DateTime<Utc>
+  }
+  class Credentials <<request>> {
+    username : String
+    password : String
+    validate_for_registration()
+  }
+  class TokenResponse <<response>> {
+    token : String
+    token_type : "Bearer"
+    expires_in : u64
+  }
+  User ..> UserResponse : From
+}
+
+package "models::todo" as pkg_todo {
+  class Todo <<response>> {
+    id : Uuid
+    {field} user_id : Uuid  (not serialized)
+    title : String
+    description : Option<String>
+    completed : bool
+    created_at, updated_at
+  }
+  class CreateTodo <<request>> {
+    title : String
+    description : Option<String>
+    validate() : NewTodo
+  }
+  class NewTodo {
+    title : String
+    description : Option<String>
+  }
+  class UpdateTodo <<request>> {
+    title : Option<String>
+    description : Option<Option<String>>
+    completed : Option<bool>
+    validate() : TodoChanges
+  }
+  class TodoChanges {
+    title : Option<String>
+    description : Option<Option<String>>
+    completed : Option<bool>
+  }
+  class ListParams <<query>> {
+    {field} limit : Option<u32>  (default 50, max 100)
+    offset : Option<u32>
+    validate() : Page
+  }
+  class Page {
+    limit : i64
+    offset : i64
+  }
+  CreateTodo ..> NewTodo
+  UpdateTodo ..> TodoChanges
+  ListParams ..> Page
+}
+@enduml

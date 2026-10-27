@@ -1,0 +1,32 @@
+@startuml lifecycle
+!include style.iuml
+title Process lifecycle (src/main.rs)
+
+start
+:Config::from_env()
+(loads .env if present);
+if (config valid?) then (no)
+  :print "configuration error" to stderr
+  exit(1); <<#FFCDD2>>
+  stop
+endif
+:telemetry::init(log_format)
+pretty or JSON, RUST_LOG filter;
+:PgPoolOptions (max 10) connect(DATABASE_URL);
+:sqlx::migrate!().run(&pool);
+:TcpListener::bind(BIND_ADDR);
+:AppState { pool, Arc<Config> };
+:axum::serve(listener, build_app(state));
+
+fork
+  :serve requests;
+fork again
+  :wait for Ctrl-C or SIGTERM
+  (docker stop);
+end fork
+:graceful shutdown
+(in-flight requests finish);
+:pool.close();
+:log "shutdown complete";
+stop
+@enduml

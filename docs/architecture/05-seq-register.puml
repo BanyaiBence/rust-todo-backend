@@ -1,0 +1,34 @@
+@startuml seq-register
+!include style.iuml
+title POST /auth/register
+
+actor Client
+participant "routes::auth::register" as H
+participant "Credentials" as C
+participant "auth::password" as P
+participant "tokio blocking pool" as B
+participant "repo::user_repo" as R
+database PostgreSQL as DB
+
+Client -> H : {"username", "password"}
+H -> C : validate_for_registration()
+alt invalid username / password
+  C --> H : AppError::Validation
+  H --> Client : 422 {"error": ...}
+end
+H -> P : hash(password)
+P -> B : spawn_blocking(argon2id hash)
+B --> P : PHC string
+P --> H : password_hash
+H -> R : create(username, password_hash)
+R -> DB : INSERT INTO users ... RETURNING
+alt unique violation on username
+  DB --> R : error 23505
+  R --> H : AppError::Conflict("username already taken")
+  H --> Client : 409
+else ok
+  DB --> R : row
+  R --> H : User
+  H --> Client : 201 UserResponse\n(id, username, created_at — no hash)
+end
+@enduml

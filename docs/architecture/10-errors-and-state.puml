@@ -1,0 +1,51 @@
+@startuml errors-and-state
+!include style.iuml
+title Errors, configuration and shared state
+
+package "auth::jwt" as pkg_jwt {
+  class Claims {
+    sub : Uuid
+    iat : i64
+    exp : i64
+  }
+}
+
+package "error" as pkg_error {
+  enum AppError {
+    NotFound -> 404
+    Unauthorized -> 401
+    {field} Conflict(String) -> 409
+    {field} Validation(String) -> 422
+    PayloadTooLarge -> 413
+    {field} Database(sqlx::Error) -> 500
+    {field} Internal(String) -> 500
+  }
+  note right of AppError
+    Body is always {"error": "..."}.
+    sqlx RowNotFound -> NotFound,
+    unique violation -> Conflict.
+    5xx messages are replaced by
+    "internal server error" and logged.
+  end note
+}
+
+package "config" as pkg_config {
+  class Config {
+    database_url : String
+    jwt_secret : String
+    jwt_ttl_seconds : u64
+    bind_addr : SocketAddr
+    log_format : LogFormat
+    cors_allowed_origins : Vec<String>
+  }
+}
+
+package "state" as pkg_state {
+  class AppState {
+    pool : PgPool
+    config : Arc<Config>
+  }
+}
+Config --o AppState
+
+@enduml

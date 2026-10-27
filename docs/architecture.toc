@@ -1,0 +1,12 @@
+\contentsline {section}{\numberline {1}System context}{3}{section.1}%
+\contentsline {section}{\numberline {2}Deployment}{4}{section.2}%
+\contentsline {section}{\numberline {3}Components}{5}{section.3}%
+\contentsline {section}{\numberline {4}Request pipeline}{6}{section.4}%
+\contentsline {section}{\numberline {5}Registration}{7}{section.5}%
+\contentsline {section}{\numberline {6}Login}{8}{section.6}%
+\contentsline {section}{\numberline {7}Authenticated todo request}{9}{section.7}%
+\contentsline {section}{\numberline {8}Data model}{10}{section.8}%
+\contentsline {section}{\numberline {9}Request and response models}{11}{section.9}%
+\contentsline {section}{\numberline {10}Errors, configuration and shared state}{12}{section.10}%
+\contentsline {section}{\numberline {11}Process lifecycle}{13}{section.11}%
+\contentsline {section}{\numberline {12}Test layout}{14}{section.12}%

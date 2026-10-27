@@ -1,0 +1,22 @@
+@startuml system-context
+!include style.iuml
+title System context
+
+actor "API client\n(curl, scripts)" as cli
+actor "Browser client\n(SPA on an allowed origin)" as browser
+
+rectangle "todo-backend" as app <<system>> {
+  note as N
+    JSON HTTP API (axum + tokio)
+    · register / log in
+    · CRUD on the caller's own todos
+    · JWT (HS256) bearer authentication
+  end note
+}
+
+database "PostgreSQL 17\n(users, todos)" as pg
+
+cli --> app : HTTPS/HTTP JSON\nAuthorization: Bearer <jwt>
+browser --> app : same, subject to CORS\n(CORS_ALLOWED_ORIGINS)
+app --> pg : sqlx connection pool\n(max 10 connections)
+@enduml

@@ -1,0 +1,45 @@
+@startuml deployment
+!include style.iuml
+title Deployment (docker-compose.yml)
+
+actor "Client" as client
+
+node "Docker host" {
+  node "compose network" {
+    node "app" as app_c <<container>> {
+      component "todo-backend\n(debian:trixie-slim, uid 10001)" as bin
+      note right of bin
+        Image built by multi-stage Dockerfile
+        (cargo-chef, SQLX_OFFLINE=true).
+        init: true -> SIGTERM forwarded,
+        graceful shutdown drains requests.
+        HEALTHCHECK: GET /health via /dev/tcp.
+        LOG_FORMAT=json
+      end note
+    }
+    node "db" as db_c <<container>> {
+      database "postgres:17-alpine\n(db: todo)" as db
+    }
+  }
+  storage "volume: pgdata" as vol
+
+  node "db-test" as dbt_c <<profile: test>> {
+    database "postgres:17-alpine\n(tmpfs data)" as dbt
+  }
+}
+
+node "Developer machine / CI" as dev {
+  component "cargo test\n(#[sqlx::test], sqlx macros)" as tests
+}
+
+client --> bin : ${APP_PORT:-3000} -> 3000
+bin --> db : postgres://todo@db:5432/todo
+db --> vol
+app_c ..> db_c : depends_on\n(service_healthy)
+tests --> dbt : localhost:5433
+
+note bottom of db_c
+  Not published to the host;
+  only the app can reach it.
+end note
+@enduml
