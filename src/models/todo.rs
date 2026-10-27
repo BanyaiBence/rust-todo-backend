@@ -1,6 +1,8 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Deserializer, Serialize};
 use uuid::Uuid;
+
+use crate::error::AppError;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Todo {
@@ -26,4 +28,88 @@ pub struct TodoChanges {
     pub title: Option<String>,
     pub description: Option<Option<String>>,
     pub completed: Option<bool>,
+}
+
+/// Body of `POST /todos`.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CreateTodo {
+    pub title: String,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+impl CreateTodo {
+    /// Validates the request and normalizes it (trimmed title) for storage.
+    pub fn validate(self) -> Result<NewTodo, AppError> {
+        Ok(NewTodo {
+            title: validate_title(&self.title)?,
+            description: self.description.map(validate_description).transpose()?,
+        })
+    }
+}
+
+/// Body of `PATCH /todos/{id}`. Omitted fields are left unchanged; `"description": null`
+/// clears the description.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateTodo {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default, deserialize_with = "present")]
+    pub description: Option<Option<String>>,
+    #[serde(default)]
+    pub completed: Option<bool>,
+}
+
+impl UpdateTodo {
+    /// Validates the request and converts it into repository changes.
+    pub fn validate(self) -> Result<TodoChanges, AppError> {
+        if self.title.is_none() && self.description.is_none() && self.completed.is_none() {
+            return Err(AppError::Validation(
+                "at least one of title, description or completed is required".to_string(),
+            ));
+        }
+
+        Ok(TodoChanges {
+            title: self.title.as_deref().map(validate_title).transpose()?,
+            description: self
+                .description
+                .map(|description| description.map(validate_description).transpose())
+                .transpose()?,
+            completed: self.completed,
+        })
+    }
+}
+
+const MAX_TITLE_CHARS: usize = 200;
+const MAX_DESCRIPTION_CHARS: usize = 2000;
+
+/// Returns the trimmed title, which must be 1-200 characters.
+fn validate_title(title: &str) -> Result<String, AppError> {
+    let title = title.trim();
+    if title.is_empty() || title.chars().count() > MAX_TITLE_CHARS {
+        return Err(AppError::Validation(format!(
+            "title must be 1-{MAX_TITLE_CHARS} characters"
+        )));
+    }
+    Ok(title.to_string())
+}
+
+fn validate_description(description: String) -> Result<String, AppError> {
+    if description.chars().count() > MAX_DESCRIPTION_CHARS {
+        return Err(AppError::Validation(format!(
+            "description must be at most {MAX_DESCRIPTION_CHARS} characters"
+        )));
+    }
+    Ok(description)
+}
+
+/// Marks a field as present (even when `null`) so it can be told apart from an omitted one.
+fn present<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    T::deserialize(deserializer).map(Some)
 }

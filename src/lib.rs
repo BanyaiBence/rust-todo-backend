@@ -22,6 +22,16 @@ pub fn build_app(state: AppState) -> Router {
         .route("/health", get(routes::health::health))
         .route("/auth/register", post(routes::auth::register))
         .route("/auth/login", post(routes::auth::login))
+        .route(
+            "/todos",
+            get(routes::todos::list).post(routes::todos::create),
+        )
+        .route(
+            "/todos/{id}",
+            get(routes::todos::get)
+                .patch(routes::todos::update)
+                .delete(routes::todos::delete),
+        )
         .layer(TraceLayer::new_for_http().on_response(DefaultOnResponse::new().level(Level::INFO)))
         .with_state(state)
 }

@@ -15,6 +15,9 @@ Rust backend for a simple todo app: users register/log in and manage their own t
 | Token lifecycle | Short-lived access token only; no refresh/logout flow |
 | Queries | Compile-time-checked `sqlx::query!` / `query_as!`; `.sqlx/` offline cache committed for Docker builds |
 | Foreign todos | Accessing another user's todo returns **404** (no existence leak) |
+| Todo validation | Title trimmed, 1–200 chars; description ≤ 2000 chars; unknown JSON fields → 422 |
+| PATCH semantics | Omitted field = unchanged; `"description": null` clears it; empty body → 422 |
+| Malformed ids | A non-UUID `{id}` path segment → 404 |
 
 ## 1. Architecture
 
@@ -191,12 +194,13 @@ cargo sqlx prepare -- --all-targets                # after changing any query; c
 - [x] `AppJson` extractor: malformed request bodies → 422 with the standard JSON error shape
 
 ### M4 — Todo CRUD
-- [ ] 🔴/🟢 All `/todos` routes → 401 without token
-- [ ] 🔴/🟢 Create 201; empty/too-long title → 422
-- [ ] 🔴/🟢 List returns only caller's todos
-- [ ] 🔴/🟢 Get/PATCH/DELETE own → OK; other user's → 404
-- [ ] 🔴/🟢 PATCH is partial and bumps `updated_at`
-- [ ] 🔴/🟢 DELETE then GET → 404
+- [x] 🔴/🟢 Unit: `CreateTodo` / `UpdateTodo` validation and null-vs-omitted description
+- [x] 🔴/🟢 All `/todos` routes → 401 without token
+- [x] 🔴/🟢 Create 201; empty/blank/too-long title, too-long description, unknown field → 422
+- [x] 🔴/🟢 List returns only caller's todos, oldest first
+- [x] 🔴/🟢 Get/PATCH/DELETE own → OK; other user's, unknown or malformed id → 404
+- [x] 🔴/🟢 PATCH is partial, can clear description, and bumps `updated_at`
+- [x] 🔴/🟢 DELETE → 204, then GET/DELETE → 404
 
 ### M5 — Docker & E2E
 - [ ] Dockerfile, `db` + `app` services in docker-compose.yml
