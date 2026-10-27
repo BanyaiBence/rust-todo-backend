@@ -166,9 +166,12 @@ cargo sqlx prepare -- --all-targets                # after changing any query; c
 - [x] `.sqlx/` offline query cache (pulled forward from M5 so builds work without a DB)
 
 ### M3 — Authentication
-- [ ] 🔴/🟢 Unit: hash/verify, JWT round-trip, expired/tampered rejected
-- [ ] 🔴/🟢 HTTP: register 201 / 409 / 422; login 200 / 401 (same message for wrong password and unknown user)
-- [ ] 🔴/🟢 `AuthUser` extractor: missing/malformed/invalid token → 401
+- [x] 🔴/🟢 Unit: hash/verify, JWT round-trip, expired/tampered rejected
+- [x] 🔴/🟢 Unit: registration rules (username 3–32 of `[A-Za-z0-9_-]`, password 8–128 chars)
+- [x] 🔴/🟢 HTTP: register 201 / 409 / 422; login 200 / 401 (same message for wrong password and unknown user)
+- [x] 🔴/🟢 `AuthUser` extractor: missing/malformed/invalid token → 401
+- [x] Unknown-user logins verify against a dummy hash (no timing-based username probing)
+- [x] `AppJson` extractor: malformed request bodies → 422 with the standard JSON error shape
 
 ### M4 — Todo CRUD
 - [ ] 🔴/🟢 All `/todos` routes → 401 without token

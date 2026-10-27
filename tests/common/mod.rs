@@ -32,14 +32,18 @@ pub fn app(pool: PgPool) -> Router {
 }
 
 /// Sends a request through the router in-process and returns the status and JSON body
-/// (`Value::Null` when the body is empty).
+/// (`Value::Null` when the body is empty). `token` is sent as a bearer token.
 pub async fn send(
-    app: Router,
+    app: &Router,
     method: Method,
     uri: &str,
     body: Option<Value>,
+    token: Option<&str>,
 ) -> (StatusCode, Value) {
     let mut builder = Request::builder().method(method).uri(uri);
+    if let Some(token) = token {
+        builder = builder.header("authorization", format!("Bearer {token}"));
+    }
     let body = match body {
         Some(json) => {
             builder = builder.header("content-type", "application/json");
@@ -48,7 +52,11 @@ pub async fn send(
         None => Body::empty(),
     };
 
-    let response = app.oneshot(builder.body(body).unwrap()).await.unwrap();
+    let response = app
+        .clone()
+        .oneshot(builder.body(body).unwrap())
+        .await
+        .unwrap();
     let status = response.status();
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
     let json = if bytes.is_empty() {
@@ -57,4 +65,24 @@ pub async fn send(
         serde_json::from_slice(&bytes).unwrap()
     };
     (status, json)
+}
+
+/// Registers `username` with a fixed valid password and returns a login token.
+#[allow(dead_code)] // not every integration test binary uses every helper
+pub async fn register_and_login(app: &Router, username: &str) -> String {
+    let credentials = serde_json::json!({ "username": username, "password": "password123" });
+
+    let (status, _) = send(
+        app,
+        Method::POST,
+        "/auth/register",
+        Some(credentials.clone()),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "register {username}");
+
+    let (status, body) = send(app, Method::POST, "/auth/login", Some(credentials), None).await;
+    assert_eq!(status, StatusCode::OK, "login {username}");
+    body["token"].as_str().unwrap().to_string()
 }
