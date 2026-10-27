@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::{
     error::AppError,
-    models::todo::{NewTodo, Todo, TodoChanges},
+    models::todo::{NewTodo, Page, Todo, TodoChanges},
 };
 
 #[tracing::instrument(skip(pool, new))]
@@ -25,9 +25,9 @@ pub async fn create(pool: &PgPool, user_id: Uuid, new: NewTodo) -> Result<Todo, 
     Ok(todo)
 }
 
-/// All todos owned by `user_id`, oldest first.
+/// One page of the todos owned by `user_id`, oldest first.
 #[tracing::instrument(skip(pool))]
-pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<Todo>, AppError> {
+pub async fn list(pool: &PgPool, user_id: Uuid, page: Page) -> Result<Vec<Todo>, AppError> {
     let todos = sqlx::query_as!(
         Todo,
         r#"
@@ -35,8 +35,11 @@ pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<Todo>, AppError> {
         FROM todos
         WHERE user_id = $1
         ORDER BY created_at, id
+        LIMIT $2 OFFSET $3
         "#,
         user_id,
+        page.limit,
+        page.offset,
     )
     .fetch_all(pool)
     .await?;

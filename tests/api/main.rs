@@ -4,5 +4,6 @@
 mod common;
 
 mod auth;
+mod cors;
 mod health;
 mod todos;

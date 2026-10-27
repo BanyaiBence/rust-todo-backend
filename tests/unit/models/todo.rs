@@ -1,7 +1,7 @@
 use serde_json::json;
 use todo_backend::{
     error::AppError,
-    models::todo::{CreateTodo, UpdateTodo},
+    models::todo::{CreateTodo, ListParams, Page, UpdateTodo},
 };
 
 fn create(body: serde_json::Value) -> CreateTodo {
@@ -117,4 +117,36 @@ fn update_without_any_field_is_rejected() {
 fn update_rejects_unknown_fields() {
     let result = serde_json::from_value::<UpdateTodo>(json!({ "complete": true }));
     assert!(result.is_err());
+}
+
+fn params(limit: Option<u32>, offset: Option<u32>) -> ListParams {
+    ListParams { limit, offset }
+}
+
+#[test]
+fn list_params_default_to_first_page_of_50() {
+    assert_eq!(
+        ListParams::default().validate().unwrap(),
+        Page {
+            limit: 50,
+            offset: 0
+        }
+    );
+}
+
+#[test]
+fn list_params_accept_limit_and_offset() {
+    assert_eq!(
+        params(Some(100), Some(250)).validate().unwrap(),
+        Page {
+            limit: 100,
+            offset: 250
+        }
+    );
+}
+
+#[test]
+fn list_params_reject_limit_outside_1_to_100() {
+    assert!(is_validation_error(params(Some(0), None).validate()));
+    assert!(is_validation_error(params(Some(101), None).validate()));
 }

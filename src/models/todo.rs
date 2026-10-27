@@ -113,3 +113,37 @@ where
 {
     T::deserialize(deserializer).map(Some)
 }
+
+/// Query string of `GET /todos`.
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ListParams {
+    pub limit: Option<u32>,
+    pub offset: Option<u32>,
+}
+
+/// A validated page window for list queries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Page {
+    pub limit: i64,
+    pub offset: i64,
+}
+
+impl ListParams {
+    pub const DEFAULT_LIMIT: u32 = 50;
+    pub const MAX_LIMIT: u32 = 100;
+
+    pub fn validate(self) -> Result<Page, AppError> {
+        let limit = self.limit.unwrap_or(Self::DEFAULT_LIMIT);
+        if !(1..=Self::MAX_LIMIT).contains(&limit) {
+            return Err(AppError::Validation(format!(
+                "limit must be between 1 and {}",
+                Self::MAX_LIMIT
+            )));
+        }
+        Ok(Page {
+            limit: limit.into(),
+            offset: self.offset.unwrap_or(0).into(),
+        })
+    }
+}

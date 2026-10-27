@@ -68,3 +68,10 @@ fn other_sqlx_errors_convert_to_database() {
         AppError::Database(_)
     ));
 }
+
+#[tokio::test]
+async fn payload_too_large_is_413() {
+    let (status, body) = render(AppError::PayloadTooLarge).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(body, json!({ "error": "request body too large" }));
+}

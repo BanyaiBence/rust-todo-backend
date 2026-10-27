@@ -17,6 +17,9 @@ use todo_backend::{
 };
 use tower::ServiceExt;
 
+/// The only origin `test_config` allows for CORS.
+pub const ALLOWED_ORIGIN: &str = "https://app.example.com";
+
 pub fn test_config() -> Config {
     Config {
         database_url: String::new(), // unused: tests receive a pool from #[sqlx::test]
@@ -24,6 +27,7 @@ pub fn test_config() -> Config {
         jwt_ttl_seconds: 3600,
         bind_addr: "127.0.0.1:0".parse().unwrap(),
         log_format: LogFormat::Pretty,
+        cors_allowed_origins: vec![ALLOWED_ORIGIN.to_string()],
     }
 }
 

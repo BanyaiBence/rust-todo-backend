@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  # Compile against the committed .sqlx query cache; a stale cache fails the build.
+  SQLX_OFFLINE: "true"
+
+jobs:
+  test:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: todo
+          POSTGRES_PASSWORD: todo
+          POSTGRES_DB: todo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U todo -d todo"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      # Used at runtime by #[sqlx::test] to create a fresh database per test.
+      DATABASE_URL: postgres://todo:todo@localhost:5432/todo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets --locked -- -D warnings
+      - run: cargo test --locked
+
+  e2e:
+    name: Docker build and end-to-end tests
+    runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: ci-only-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
+      - uses: Swatinem/rust-cache@v2
+      - name: Start stack
+        run: docker compose up -d --build --wait
+      - run: cargo test --locked --test e2e -- --ignored
+      - name: App logs
+        if: failure()
+        run: docker compose logs app
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v

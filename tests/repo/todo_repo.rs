@@ -1,12 +1,17 @@
 use sqlx::PgPool;
 use todo_backend::{
-    models::todo::{NewTodo, TodoChanges},
+    models::todo::{NewTodo, Page, TodoChanges},
     repo::{
         todo_repo::{create, delete, get, list, update},
         user_repo,
     },
 };
 use uuid::Uuid;
+
+const FIRST_PAGE: Page = Page {
+    limit: 50,
+    offset: 0,
+};
 
 async fn user(pool: &PgPool, name: &str) -> Uuid {
     user_repo::create(pool, name, "hash").await.unwrap().id
@@ -40,7 +45,7 @@ async fn list_returns_only_the_owners_todos_in_creation_order(pool: PgPool) {
     create(&pool, bob, new_todo("bobs")).await.unwrap();
     create(&pool, alice, new_todo("second")).await.unwrap();
 
-    let titles: Vec<_> = list(&pool, alice)
+    let titles: Vec<_> = list(&pool, alice, FIRST_PAGE)
         .await
         .unwrap()
         .into_iter()
@@ -178,5 +183,26 @@ async fn deleting_a_user_cascades_to_their_todos(pool: PgPool) {
         .await
         .unwrap();
 
-    assert!(list(&pool, alice).await.unwrap().is_empty());
+    assert!(list(&pool, alice, FIRST_PAGE).await.unwrap().is_empty());
+}
+
+#[sqlx::test]
+async fn list_applies_limit_and_offset(pool: PgPool) {
+    let alice = user(&pool, "alice").await;
+    for title in ["t1", "t2", "t3", "t4", "t5"] {
+        create(&pool, alice, new_todo(title)).await.unwrap();
+    }
+
+    let page = Page {
+        limit: 2,
+        offset: 1,
+    };
+    let titles: Vec<_> = list(&pool, alice, page)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|t| t.title)
+        .collect();
+
+    assert_eq!(titles, ["t2", "t3"]);
 }

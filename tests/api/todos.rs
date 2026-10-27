@@ -267,3 +267,55 @@ async fn delete_removes_the_todo(pool: PgPool) {
     let (status, _) = send(&app, Method::DELETE, &uri, None, Some(&token)).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+#[sqlx::test]
+async fn list_is_paginated_with_limit_and_offset(pool: PgPool) {
+    let app = common::app(pool);
+    let token = register_and_login(&app, "alice").await;
+    for title in ["t1", "t2", "t3", "t4"] {
+        create_todo(&app, &token, json!({ "title": title })).await;
+    }
+
+    let (status, body) = send(
+        &app,
+        Method::GET,
+        "/todos?limit=2&offset=1",
+        None,
+        Some(&token),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    let titles: Vec<_> = body
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["title"].clone())
+        .collect();
+    assert_eq!(titles, [json!("t2"), json!("t3")]);
+}
+
+#[sqlx::test]
+async fn invalid_pagination_is_unprocessable(pool: PgPool) {
+    let app = common::app(pool);
+    let token = register_and_login(&app, "alice").await;
+
+    for query in ["limit=0", "limit=101", "limit=abc", "offset=-1", "page=2"] {
+        let uri = format!("/todos?{query}");
+        let (status, body) = send(&app, Method::GET, &uri, None, Some(&token)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{query}");
+        assert!(body["error"].is_string(), "{query}");
+    }
+}
+
+#[sqlx::test]
+async fn oversized_body_is_rejected_with_413(pool: PgPool) {
+    let app = common::app(pool);
+    let token = register_and_login(&app, "alice").await;
+    let huge = json!({ "title": "x", "description": "d".repeat(100 * 1024) });
+
+    let (status, body) = send(&app, Method::POST, "/todos", Some(huge), Some(&token)).await;
+
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(body, json!({ "error": "request body too large" }));
+}

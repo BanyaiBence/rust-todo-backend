@@ -18,6 +18,9 @@ Rust backend for a simple todo app: users register/log in and manage their own t
 | Todo validation | Title trimmed, 1–200 chars; description ≤ 2000 chars; unknown JSON fields → 422 |
 | PATCH semantics | Omitted field = unchanged; `"description": null` clears it; empty body → 422 |
 | Malformed ids | A non-UUID `{id}` path segment → 404 |
+| Pagination | `limit` 1–100 (default 50), `offset` ≥ 0 (default 0); response stays a plain array |
+| Body limit | 64 KiB; larger bodies → 413 |
+| CORS | `CORS_ALLOWED_ORIGINS` (comma-separated, or `*`); default none |
 
 ## 1. Architecture
 
@@ -104,7 +107,7 @@ Migrations run at startup via `sqlx::migrate!()`.
 | GET | `/health` | – | 200 | – |
 | POST | `/auth/register` | – | 201 + user | 409 taken, 422 invalid |
 | POST | `/auth/login` | – | 200 `{token}` | 401 |
-| GET | `/todos` | Bearer | 200 (own only) | 401 |
+| GET | `/todos?limit=&offset=` | Bearer | 200 (own only, paginated) | 401, 422 |
 | POST | `/todos` | Bearer | 201 | 422 |
 | GET | `/todos/{id}` | Bearer | 200 | 404 |
 | PATCH | `/todos/{id}` | Bearer | 200 (partial update) | 404, 422 |
@@ -132,6 +135,7 @@ JWT_TTL_SECONDS=3600
 BIND_ADDR=0.0.0.0:3000
 RUST_LOG=todo_backend=debug,tower_http=info
 LOG_FORMAT=pretty   # or json
+CORS_ALLOWED_ORIGINS=   # e.g. https://app.example.com,http://localhost:5173 or *
 ```
 
 ## 6. Logging
@@ -215,5 +219,9 @@ cargo test --test e2e -- --ignored                 # end-to-end smoke tests agai
 - [x] Verified: non-root container, data persists across `down`/`up`, fast shutdown
 
 ### M6 — Hardening (optional)
-- [ ] CORS, body size limit, graceful shutdown, pagination
-- [ ] CI: fmt, clippy `-D warnings`, test (Postgres service), docker build
+- [x] 🔴/🟢 Body size limit (64 KiB) → 413 with standard JSON error
+- [x] 🔴/🟢 Pagination on `GET /todos` (`limit`/`offset`, validated)
+- [x] 🔴/🟢 CORS from `CORS_ALLOWED_ORIGINS`
+- [x] Graceful shutdown on SIGTERM/Ctrl-C, closing the DB pool (verified via `docker compose stop`)
+- [x] CI (`.github/workflows/ci.yml`): fmt, clippy `-D warnings`, tests against a Postgres service,
+      docker compose build + e2e tests

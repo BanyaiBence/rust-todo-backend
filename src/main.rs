@@ -27,10 +27,36 @@ async fn main() {
     tracing::info!(addr = %config.bind_addr, "listening");
 
     let state = AppState {
-        pool,
+        pool: pool.clone(),
         config: Arc::new(config),
     };
     axum::serve(listener, build_app(state))
+        .with_graceful_shutdown(shutdown_signal())
         .await
         .expect("server error");
+
+    pool.close().await;
+    tracing::info!("shutdown complete");
+}
+
+/// Resolves on Ctrl-C or SIGTERM (what `docker stop` sends). In-flight requests are then
+/// allowed to finish before the server exits.
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl-C handler");
+    };
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    tokio::select! {
+        () = ctrl_c => {},
+        () = terminate => {},
+    }
+    tracing::info!("shutdown signal received, draining connections");
 }

@@ -13,6 +13,8 @@ pub struct Config {
     pub jwt_ttl_seconds: u64,
     pub bind_addr: SocketAddr,
     pub log_format: LogFormat,
+    /// Origins allowed to call the API from a browser; `["*"]` allows any. Empty disables CORS.
+    pub cors_allowed_origins: Vec<String>,
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -65,14 +67,41 @@ impl Config {
             }
         };
 
+        let cors_allowed_origins = parse_origins(&optional("CORS_ALLOWED_ORIGINS", ""))?;
+
         Ok(Self {
             database_url,
             jwt_secret,
             jwt_ttl_seconds,
             bind_addr,
             log_format,
+            cors_allowed_origins,
         })
     }
+}
+
+/// Parses a comma-separated origin list; `*` alone allows any origin.
+fn parse_origins(raw: &str) -> Result<Vec<String>, ConfigError> {
+    let origins: Vec<String> = raw
+        .split(',')
+        .map(str::trim)
+        .filter(|origin| !origin.is_empty())
+        .map(str::to_string)
+        .collect();
+
+    if origins == ["*"] {
+        return Ok(origins);
+    }
+    if let Some(bad) = origins
+        .iter()
+        .find(|origin| !(origin.starts_with("http://") || origin.starts_with("https://")))
+    {
+        return Err(invalid(
+            "CORS_ALLOWED_ORIGINS",
+            format!("`{bad}` is not an http(s) origin (or use `*` alone)"),
+        ));
+    }
+    Ok(origins)
 }
 
 fn invalid(name: &'static str, reason: impl ToString) -> ConfigError {

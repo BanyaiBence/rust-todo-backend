@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, user_id, title, description, completed, created_at, updated_at\n        FROM todos\n        WHERE user_id = $1\n        ORDER BY created_at, id\n        ",
+  "query": "\n        SELECT id, user_id, title, description, completed, created_at, updated_at\n        FROM todos\n        WHERE user_id = $1\n        ORDER BY created_at, id\n        LIMIT $2 OFFSET $3\n        ",
   "describe": {
     "columns": [
       {
@@ -83,7 +83,9 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "Uuid",
+        "Int8",
+        "Int8"
       ]
     },
     "nullable": [
@@ -96,5 +98,5 @@
       false
     ]
   },
-  "hash": "6f1ab208af72f6a8f90f07c96e3ec9a255f666cf16e5cc7c1f2e5095ac18ccb9"
+  "hash": "22a6e824519ad8f6565a80bd4d3d33e3f740b96bf9cb6e35625d9195963aebcc"
 }

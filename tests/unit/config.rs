@@ -27,6 +27,7 @@ fn parses_required_values_and_applies_defaults() {
     assert_eq!(config.jwt_ttl_seconds, 3600);
     assert_eq!(config.bind_addr, "0.0.0.0:3000".parse().unwrap());
     assert_eq!(config.log_format, LogFormat::Pretty);
+    assert!(config.cors_allowed_origins.is_empty());
 }
 
 #[test]
@@ -87,6 +88,56 @@ fn invalid_values_are_rejected() {
         assert!(
             matches!(err, ConfigError::Invalid { name: n, .. } if n == name),
             "{name}={value} should be invalid, got {err:?}"
+        );
+    }
+}
+
+#[test]
+fn cors_origins_are_a_comma_separated_list() {
+    let mut pairs = REQUIRED.to_vec();
+    pairs.push((
+        "CORS_ALLOWED_ORIGINS",
+        " https://app.example.com, http://localhost:5173 ,",
+    ));
+
+    let config = Config::from_lookup(lookup_from(&pairs)).unwrap();
+
+    assert_eq!(
+        config.cors_allowed_origins,
+        ["https://app.example.com", "http://localhost:5173"]
+    );
+}
+
+#[test]
+fn cors_wildcard_is_accepted() {
+    let mut pairs = REQUIRED.to_vec();
+    pairs.push(("CORS_ALLOWED_ORIGINS", "*"));
+
+    let config = Config::from_lookup(lookup_from(&pairs)).unwrap();
+
+    assert_eq!(config.cors_allowed_origins, ["*"]);
+}
+
+#[test]
+fn cors_origins_must_be_http_urls() {
+    for value in [
+        "app.example.com",
+        "ftp://files.example.com",
+        "https://ok.example, nope",
+    ] {
+        let mut pairs = REQUIRED.to_vec();
+        pairs.push(("CORS_ALLOWED_ORIGINS", value));
+
+        let err = Config::from_lookup(lookup_from(&pairs)).unwrap_err();
+        assert!(
+            matches!(
+                err,
+                ConfigError::Invalid {
+                    name: "CORS_ALLOWED_ORIGINS",
+                    ..
+                }
+            ),
+            "{value:?} should be invalid, got {err:?}"
         );
     }
 }

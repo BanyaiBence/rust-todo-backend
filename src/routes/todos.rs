@@ -4,8 +4,8 @@ use uuid::Uuid;
 use crate::{
     auth::AuthUser,
     error::AppError,
-    extract::{AppJson, AppPath},
-    models::todo::{CreateTodo, Todo, UpdateTodo},
+    extract::{AppJson, AppPath, AppQuery},
+    models::todo::{CreateTodo, ListParams, Todo, UpdateTodo},
     repo::todo_repo,
     state::AppState,
 };
@@ -13,8 +13,10 @@ use crate::{
 pub async fn list(
     State(state): State<AppState>,
     AuthUser(user_id): AuthUser,
+    AppQuery(params): AppQuery<ListParams>,
 ) -> Result<Json<Vec<Todo>>, AppError> {
-    Ok(Json(todo_repo::list(&state.pool, user_id).await?))
+    let page = params.validate()?;
+    Ok(Json(todo_repo::list(&state.pool, user_id, page).await?))
 }
 
 pub async fn create(

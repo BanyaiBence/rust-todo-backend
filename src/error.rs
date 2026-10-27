@@ -15,6 +15,8 @@ pub enum AppError {
     Conflict(String),
     #[error("{0}")]
     Validation(String),
+    #[error("request body too large")]
+    PayloadTooLarge,
     #[error(transparent)]
     Database(sqlx::Error),
     #[error("{0}")]
@@ -28,6 +30,7 @@ impl IntoResponse for AppError {
             AppError::Unauthorized => StatusCode::UNAUTHORIZED,
             AppError::Conflict(_) => StatusCode::CONFLICT,
             AppError::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            AppError::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             AppError::Database(_) | AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
