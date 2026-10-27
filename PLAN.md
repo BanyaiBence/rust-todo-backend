@@ -145,8 +145,8 @@ never recording passwords or tokens.
 - [x] 🔴/🟢 `Config` parsing: valid env, missing vars, invalid values
 
 ### M1 — Errors & infrastructure
-- [ ] 🔴/🟢 `AppError` → status code + JSON body for each variant
-- [ ] Tracing init + `TraceLayer`
+- [x] 🔴/🟢 `AppError` → status code + JSON body for each variant; `sqlx::Error` conversion
+- [x] Tracing init (pretty/JSON) + `TraceLayer` (responses logged at INFO)
 
 ### M2 — Database & repositories
 - [ ] Migrations, `AppState { pool, config }`, `db-test` compose service
