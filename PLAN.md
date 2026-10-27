@@ -58,11 +58,12 @@ todo-backend/
     │   ├── main.rs
     │   ├── user_repo.rs
     │   └── todo_repo.rs
-    └── api/                    # binary `api`: HTTP tests through the full router
-        ├── main.rs
-        ├── health.rs
-        ├── auth.rs
-        └── todos.rs
+    ├── api/                    # binary `api`: HTTP tests through the full router
+    │   ├── main.rs
+    │   ├── health.rs
+    │   ├── auth.rs
+    │   └── todos.rs
+    └── e2e/main.rs             # binary `e2e`: #[ignore]d smoke tests against the running stack
 ```
 
 Test files mirror the `src/` path of the code they test. Each directory under `tests/` is one
@@ -141,11 +142,14 @@ never recording passwords or tokens.
 
 ## 7. Docker
 
-- **Dockerfile:** multi-stage; builder with cargo-chef for dependency caching and
-  `SQLX_OFFLINE=true`; slim runtime image, non-root user.
+- **Dockerfile:** multi-stage; cargo-chef caches the dependency build, `SQLX_OFFLINE=true` builds
+  against the committed `.sqlx/` cache; `debian:trixie-slim` runtime (~130 MB), non-root user,
+  JSON logs, `/health` healthcheck. Migrations are embedded in the binary.
 - **docker-compose.yml:**
-  - `db`: `postgres:17-alpine`, named volume, `pg_isready` healthcheck
-  - `app`: depends on `db` being healthy, `env_file: .env`, port 3000
+  - `db`: `postgres:17-alpine`, named volume `pgdata`, `pg_isready` healthcheck, not published to the host
+  - `app`: waits for `db` to be healthy, port `${APP_PORT:-3000}`, `init: true` for signal forwarding.
+    `DATABASE_URL` is set explicitly (the local `.env` targets `db-test`); only `JWT_SECRET`
+    (required), `JWT_TTL_SECONDS` and `POSTGRES_PASSWORD` are taken from the environment / `.env`
   - `db-test` (profile `test`): tmpfs-backed Postgres on port 5433 for `cargo test`
 
 ## 8. TDD workflow
@@ -166,6 +170,9 @@ docker compose --profile test up -d --wait db-test
 sqlx migrate run                                   # schema for compile-time query checks
 cargo test
 cargo sqlx prepare -- --all-targets                # after changing any query; commit .sqlx/
+
+docker compose up -d --build --wait                # full stack on http://localhost:3000
+cargo test --test e2e -- --ignored                 # end-to-end smoke tests against it
 ```
 
 ## 10. Milestones
@@ -203,8 +210,9 @@ cargo sqlx prepare -- --all-targets                # after changing any query; c
 - [x] 🔴/🟢 DELETE → 204, then GET/DELETE → 404
 
 ### M5 — Docker & E2E
-- [ ] Dockerfile, `db` + `app` services in docker-compose.yml
-- [ ] `#[ignore]` smoke test against `docker compose up`: register → login → CRUD
+- [x] Dockerfile, `db` + `app` services in docker-compose.yml, `.dockerignore`
+- [x] `tests/e2e`: `#[ignore]` smoke tests against `docker compose up` (health; register → login → CRUD)
+- [x] Verified: non-root container, data persists across `down`/`up`, fast shutdown
 
 ### M6 — Hardening (optional)
 - [ ] CORS, body size limit, graceful shutdown, pagination

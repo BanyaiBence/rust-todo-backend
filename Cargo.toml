@@ -31,6 +31,7 @@ uuid = { version = "1.29.0", features = ["v4", "serde"] }
 
 [dev-dependencies]
 http-body-util = "0.1.5"
+reqwest = { version = "0.13.5", default-features = false, features = ["json"] }
 tower = { version = "0.5.3", features = ["util"] }
 
 # Unoptimized argon2 makes every password hash in debug builds and tests painfully slow.

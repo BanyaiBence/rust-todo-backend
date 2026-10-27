@@ -1,6 +1,40 @@
+# Application stack:      docker compose up -d --build --wait
+# Test database only:     docker compose --profile test up -d --wait db-test
+#
+# Compose reads .env for ${...} substitution only; the app's DATABASE_URL is set here
+# explicitly so the local .env (which points at db-test for cargo) does not leak in.
+
 services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: todo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-todo}
+      POSTGRES_DB: todo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Not published to the host: only the app talks to it, over the compose network.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U todo -d todo"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  app:
+    build: .
+    init: true # forward SIGTERM so `docker compose stop` is immediate
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://todo:${POSTGRES_PASSWORD:-todo}@db:5432/todo
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set (e.g. in .env)}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS:-3600}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    restart: unless-stopped
+
   # Throwaway database for `cargo test` and sqlx compile-time query checks.
-  # Start with: docker compose --profile test up -d db-test
   db-test:
     image: postgres:17-alpine
     profiles: ["test"]
@@ -17,3 +51,6 @@ services:
       interval: 2s
       timeout: 3s
       retries: 15
+
+volumes:
+  pgdata:
