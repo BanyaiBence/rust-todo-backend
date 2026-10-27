@@ -3,6 +3,16 @@ name = "todo-backend"
 version = "0.1.0"
 edition = "2024"
 
+# All tests live under tests/ (see PLAN.md), so skip the empty in-crate test harnesses.
+[lib]
+test = false
+doctest = false
+
+[[bin]]
+name = "todo-backend"
+path = "src/main.rs"
+test = false
+
 [dependencies]
 argon2 = "0.6.0"
 axum = { version = "0.8.9", features = ["macros"] }

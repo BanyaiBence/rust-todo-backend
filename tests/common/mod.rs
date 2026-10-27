@@ -1,3 +1,6 @@
+//! Helpers shared by the test binaries; each binary uses a different subset.
+#![allow(dead_code)]
+
 use std::sync::Arc;
 
 use axum::{
@@ -68,7 +71,6 @@ pub async fn send(
 }
 
 /// Registers `username` with a fixed valid password and returns a login token.
-#[allow(dead_code)] // not every integration test binary uses every helper
 pub async fn register_and_login(app: &Router, username: &str) -> String {
     let credentials = serde_json::json!({ "username": username, "password": "password123" });
 

@@ -1,20 +1,18 @@
-mod common;
-
 use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
 async fn register(app: &axum::Router, body: Value) -> (StatusCode, Value) {
-    common::send(app, Method::POST, "/auth/register", Some(body), None).await
+    crate::common::send(app, Method::POST, "/auth/register", Some(body), None).await
 }
 
 async fn login(app: &axum::Router, body: Value) -> (StatusCode, Value) {
-    common::send(app, Method::POST, "/auth/login", Some(body), None).await
+    crate::common::send(app, Method::POST, "/auth/login", Some(body), None).await
 }
 
 #[sqlx::test]
 async fn register_creates_user_without_exposing_password(pool: PgPool) {
-    let app = common::app(pool);
+    let app = crate::common::app(pool);
 
     let (status, body) = register(
         &app,
@@ -32,7 +30,7 @@ async fn register_creates_user_without_exposing_password(pool: PgPool) {
 
 #[sqlx::test]
 async fn register_stores_a_hash_not_the_password(pool: PgPool) {
-    let app = common::app(pool.clone());
+    let app = crate::common::app(pool.clone());
     register(
         &app,
         json!({ "username": "alice", "password": "password123" }),
@@ -50,7 +48,7 @@ async fn register_stores_a_hash_not_the_password(pool: PgPool) {
 
 #[sqlx::test]
 async fn register_duplicate_username_is_conflict(pool: PgPool) {
-    let app = common::app(pool);
+    let app = crate::common::app(pool);
     register(
         &app,
         json!({ "username": "alice", "password": "password123" }),
@@ -69,7 +67,7 @@ async fn register_duplicate_username_is_conflict(pool: PgPool) {
 
 #[sqlx::test]
 async fn register_invalid_input_is_unprocessable(pool: PgPool) {
-    let app = common::app(pool);
+    let app = crate::common::app(pool);
 
     let (status, body) =
         register(&app, json!({ "username": "al", "password": "password123" })).await;
@@ -80,7 +78,7 @@ async fn register_invalid_input_is_unprocessable(pool: PgPool) {
 
 #[sqlx::test]
 async fn malformed_body_gets_a_json_error(pool: PgPool) {
-    let app = common::app(pool);
+    let app = crate::common::app(pool);
 
     let (status, body) = register(&app, json!({ "username": "alice" })).await;
 
@@ -90,7 +88,7 @@ async fn malformed_body_gets_a_json_error(pool: PgPool) {
 
 #[sqlx::test]
 async fn login_returns_a_bearer_token(pool: PgPool) {
-    let app = common::app(pool.clone());
+    let app = crate::common::app(pool.clone());
     register(
         &app,
         json!({ "username": "alice", "password": "password123" }),
@@ -107,7 +105,8 @@ async fn login_returns_a_bearer_token(pool: PgPool) {
     assert_eq!(body["token_type"], "Bearer");
     assert_eq!(body["expires_in"], 3600);
     let token = body["token"].as_str().unwrap();
-    let claims = todo_backend::auth::jwt::verify(token, &common::test_config().jwt_secret).unwrap();
+    let claims =
+        todo_backend::auth::jwt::verify(token, &crate::common::test_config().jwt_secret).unwrap();
     let alice_id: uuid::Uuid = sqlx::query_scalar("SELECT id FROM users WHERE username = 'alice'")
         .fetch_one(&pool)
         .await
@@ -117,7 +116,7 @@ async fn login_returns_a_bearer_token(pool: PgPool) {
 
 #[sqlx::test]
 async fn wrong_password_and_unknown_user_are_indistinguishable(pool: PgPool) {
-    let app = common::app(pool);
+    let app = crate::common::app(pool);
     register(
         &app,
         json!({ "username": "alice", "password": "password123" }),

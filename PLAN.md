@@ -43,12 +43,28 @@ todo-backend/
 │   ├── routes/                 # health, auth, todos
 │   ├── models/                 # entities + request/response DTOs
 │   └── repo/                   # user_repo, todo_repo
-└── tests/
-    ├── common/mod.rs           # app builder, request helper, register+login helper
-    ├── health.rs
-    ├── auth.rs
-    └── todos.rs
+└── tests/                      # all tests; src/ contains application code only
+    ├── common/mod.rs           # shared helpers: test config, app builder, request helper, register+login
+    ├── unit/                   # binary `unit`: pure logic, no database
+    │   ├── main.rs
+    │   ├── config.rs
+    │   ├── error.rs
+    │   ├── auth/{password,jwt,extractor}.rs
+    │   └── models/user.rs
+    ├── repo/                   # binary `repo`: repositories against PostgreSQL
+    │   ├── main.rs
+    │   ├── user_repo.rs
+    │   └── todo_repo.rs
+    └── api/                    # binary `api`: HTTP tests through the full router
+        ├── main.rs
+        ├── health.rs
+        ├── auth.rs
+        └── todos.rs
 ```
+
+Test files mirror the `src/` path of the code they test. Each directory under `tests/` is one
+test binary (`cargo test --test unit|repo|api`), which keeps link times down and lets the
+database-free `unit` suite run anywhere.
 
 `main.rs` stays tiny; everything lives in the library so integration tests drive the real
 `Router` in-process via `tower::ServiceExt::oneshot` (no port binding).
@@ -134,7 +150,8 @@ never recording passwords or tokens.
 - DB-backed tests use `#[sqlx::test(migrations = "./migrations")]` — a fresh migrated database per
   test, parallel-safe. Requires `DATABASE_URL` pointing at a reachable Postgres
   (`docker compose --profile test up -d db-test`).
-- Pure logic gets `#[cfg(test)]` unit tests (hashing, JWT, error mapping, config parsing).
+- Pure logic (hashing, JWT, error mapping, config parsing, validation) is tested in `tests/unit/`.
+- No `#[cfg(test)]` modules in `src/`; library/binary test harnesses are disabled in `Cargo.toml`.
 - Each step: 🔴 failing test → 🟢 minimal implementation → ♻️ refactor → commit.
 
 ## 9. Local development
