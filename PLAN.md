@@ -137,7 +137,18 @@ never recording passwords or tokens.
 - Pure logic gets `#[cfg(test)]` unit tests (hashing, JWT, error mapping, config parsing).
 - Each step: 🔴 failing test → 🟢 minimal implementation → ♻️ refactor → commit.
 
-## 9. Milestones
+## 9. Local development
+
+```sh
+cargo install sqlx-cli --no-default-features --features rustls,postgres
+cp .env.example .env                               # points DATABASE_URL at db-test (port 5433)
+docker compose --profile test up -d --wait db-test
+sqlx migrate run                                   # schema for compile-time query checks
+cargo test
+cargo sqlx prepare -- --all-targets                # after changing any query; commit .sqlx/
+```
+
+## 10. Milestones
 
 ### M0 — Scaffolding
 - [x] Dependencies, module layout, `lib.rs` with `build_app`
@@ -149,9 +160,10 @@ never recording passwords or tokens.
 - [x] Tracing init (pretty/JSON) + `TraceLayer` (responses logged at INFO)
 
 ### M2 — Database & repositories
-- [ ] Migrations, `AppState { pool, config }`, `db-test` compose service
-- [ ] 🔴/🟢 `user_repo`: create, find by username, duplicate → `Conflict`
-- [ ] 🔴/🟢 `todo_repo`: create, list by user, get/update/delete scoped to user
+- [x] Migrations, `AppState { pool, config }`, `db-test` compose service, migrations on startup
+- [x] 🔴/🟢 `user_repo`: create, find by username, duplicate → `Conflict`
+- [x] 🔴/🟢 `todo_repo`: create, list by user, get/update/delete scoped to user, cascade on user delete
+- [x] `.sqlx/` offline query cache (pulled forward from M5 so builds work without a DB)
 
 ### M3 — Authentication
 - [ ] 🔴/🟢 Unit: hash/verify, JWT round-trip, expired/tampered rejected
@@ -167,7 +179,7 @@ never recording passwords or tokens.
 - [ ] 🔴/🟢 DELETE then GET → 404
 
 ### M5 — Docker & E2E
-- [ ] Dockerfile, docker-compose.yml, `.env.example`, `cargo sqlx prepare`
+- [ ] Dockerfile, `db` + `app` services in docker-compose.yml
 - [ ] `#[ignore]` smoke test against `docker compose up`: register → login → CRUD
 
 ### M6 — Hardening (optional)
